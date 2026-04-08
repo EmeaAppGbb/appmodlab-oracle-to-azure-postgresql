@@ -1,0 +1,24 @@
+version: '3.8'
+
+services:
+  oracle-xe:
+    image: gvenzl/oracle-xe:21-slim
+    container_name: skyreward-oracle
+    ports:
+      - "1521:1521"
+      - "5500:5500"
+    environment:
+      - ORACLE_PASSWORD=OraclePass123
+      - ORACLE_DATABASE=SKYREWARD
+    volumes:
+      - oracle-data:/opt/oracle/oradata
+      - ./oracle:/docker-entrypoint-initdb.d/setup:ro
+    healthcheck:
+      test: ["CMD", "healthcheck.sh"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+volumes:
+  oracle-data:
+    driver: local

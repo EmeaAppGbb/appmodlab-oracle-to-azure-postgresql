@@ -14,3 +14,16 @@ Thumbs.db
 # Dependencies
 node_modules/
 vendor/
+
+# Oracle Database Project
+docker-compose.override.yml
+.env
+
+# Oracle datafiles
+*.dbf
+*.ctl
+*.trc
+
+# Temporary files
+tmp/
+temp/
