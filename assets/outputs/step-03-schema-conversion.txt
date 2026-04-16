@@ -1,0 +1,111 @@
+ÔùÅ Read 02_tables.sql
+  Ôöé oracle\schema\02_tables.sql
+  Ôöö 305 lines read
+
+ÔùÅ Read 01_sequences.sql
+  Ôöé oracle\schema\01_sequences.sql
+  Ôöö 77 lines read
+
+ÔùÅ List directory postgresql
+
+ÔùÅ List directory oracle\schema
+  Ôöö 4 files found
+
+ÔùÅ Read 03_indexes.sql
+  Ôöé oracle\schema\03_indexes.sql
+  Ôöö 141 lines read
+
+ÔùÅ Read 04_constraints.sql
+  Ôöé oracle\schema\04_constraints.sql
+  Ôöö 142 lines read
+
+ÔùÅ Search (glob)
+  Ôöé "oracle/synonyms/**"
+  Ôöö 1 file found
+
+ÔùÅ Read synonyms.sql
+  Ôöé oracle\synonyms\synonyms.sql
+  Ôöö 49 lines read
+
+ÔùÅ Search (glob)
+  Ôöé "postgresql/schema/**"
+  Ôöö No matches found
+
+ÔùÅ Search (glob)
+  Ôöé "postgresql/setup.sql"
+  Ôöö No matches found
+
+Now I have all the Oracle files. Let me create the PostgreSQL schema files.
+
+ÔùÅ Create postgresql/schema directory (shell)
+  Ôöé New-Item -ItemType Directory -Path
+  Ôöé "C:\code\gbb\labs\appmodlab-oracle-to-azure-postgresql\postgresql\schema"
+  Ôöé -Force
+  Ôöö 4 lines...
+
+ÔùÅ Create setup.sql +33
+  Ôöö postgresql\setup.sql
+
+ÔùÅ Create 01_tables.sql +417
+  Ôöö postgresql\schema\01_tables.sql
+
+ÔùÅ Create 02_sequences.sql +88
+  Ôöö postgresql\schema\02_sequences.sql
+
+ÔùÅ Create 03_indexes.sql +137
+  Ôöö postgresql\schema\03_indexes.sql
+
+ÔùÅ Create 04_constraints.sql +20
+  Ôöö postgresql\schema\04_constraints.sql
+
+ÔùÅ Create 05_synonyms_to_views.sql +67
+  Ôöö postgresql\schema\05_synonyms_to_views.sql
+
+Now let me fix an issue ÔÇö `batch_processing_log.batch_id` should use its own sequence, not share `seq_expiry_batch_id`:
+
+ÔùÅ Read 02_sequences.sql
+  Ôöé postgresql\schema\02_sequences.sql
+  Ôöö L60:84 (25 lines read)
+
+The Oracle schema has `seq_expiry_batch_id` used for miles_expiry but batch_processing_log doesn't have its own sequence in Oracle ÔÇö it reuses the same one. However, sharing a sequence between two tables is problematic. Let me split them properly:
+
+ÔùÅ Edit 02_sequences.sql +9 -3
+  Ôöö postgresql\schema\02_sequences.sql
+
+ÔùÅ Edit 02_sequences.sql +2 -1
+  Ôöö postgresql\schema\02_sequences.sql
+
+Let me verify all files are correct:
+
+ÔùÅ List directory postgresql
+  Ôöö 2 files found
+
+ÔùÅ List PostgreSQL schema files (shell)
+  Ôöé Get-ChildItem -Recurse
+  Ôöé "C:\code\gbb\labs\appmodlab-oracle-to-azure-postgresql\postgresql\schema" |
+  Ôöé Select-Object Name, Length
+  Ôöö 8 lines...
+
+All 6 files created successfully. Here's a summary of the Oracle ÔåÆ PostgreSQL conversions:
+
+**`01_tables.sql`** ÔÇö All 11 tables converted:
+- `NUMBER(n)` ÔåÆ `INTEGER`/`BIGINT`, `NUMBER(n,m)` ÔåÆ `NUMERIC(n,m)`
+- `VARCHAR2` ÔåÆ `VARCHAR`, `CLOB` ÔåÆ `TEXT`
+- `SYSDATE` ÔåÆ `CURRENT_TIMESTAMP`, `USER` ÔåÆ `CURRENT_USER`
+- Oracle `DATE` ÔåÆ `TIMESTAMP` (Oracle DATE includes time)
+- All constraints (PK, FK, UNIQUE, CHECK) + COMMENT ON statements included
+
+**`02_sequences.sql`** ÔÇö 11 sequences converted (split `seq_expiry_batch_id` into `seq_expiry_id` + `seq_batch_id`), removed `NOCACHE`/`NOCYCLE`, wired defaults via `ALTER TABLE ... SET DEFAULT nextval()`, set sequence ownership
+
+**`03_indexes.sql`** ÔÇö All indexes converted: bitmap ÔåÆ B-tree, Oracle Text (`CTXSYS.CONTEXT`) ÔåÆ PostgreSQL `GIN(to_tsvector())`, deduplicated overlapping bitmap/B-tree indexes
+
+**`04_constraints.sql`** ÔÇö Added cross-table FKs (`rewards.partner_id`, `miles_expiry.batch_id`)
+
+**`05_synonyms_to_views.sql`** ÔÇö Public synonyms ÔåÆ `search_path` config, private synonyms ÔåÆ views
+
+**`setup.sql`** ÔÇö Master script runs all files in dependency order via `\i`
+
+
+Changes   +773 -5
+Requests  3 Premium (3m 4s)
+Tokens    Ôåæ 388.4k ÔÇó Ôåô 13.8k ÔÇó 342.6k (cached)
