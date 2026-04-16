@@ -133,3 +133,110 @@ Visual walkthroughs of the Oracle database objects requiring conversion. Open th
 | 6 | [Member Summary View](assets/screenshots/06-view-member-summary.html) | View using MONTHS_BETWEEN, DECODE, RANK() OVER, NVL, TRUNC |
 | 7 | [Expire Miles Procedure](assets/screenshots/07-procedure-expire-miles.html) | Batch expiration with cursor FOR loop and periodic COMMIT |
 | 8 | [Reward Fulfillment Queue](assets/screenshots/08-queue-reward-fulfillment.html) | DBMS_AQ/DBMS_AQADM queue with custom TYPE payload |
+
+## Solution Walkthrough
+
+This solution was built using the **GitHub Copilot CLI** (`copilot`) in fully autonomous mode. Each step was executed as a single CLI prompt, with all code changes made by Copilot. The `solution-final` branch contains the complete migration.
+
+### Branch & Tags
+
+| Branch / Tag | Description |
+|---|---|
+| `solution-final` | Complete solution branch with all 8 steps |
+| `step-01-explore-oracle` | Oracle database assessment and feature catalog |
+| `step-02-ora2pg-assessment` | ora2pg configuration and migration complexity report |
+| `step-03-schema-conversion` | PostgreSQL schema (tables, sequences, indexes, constraints) |
+| `step-04-plsql-migration` | PL/SQL → PL/pgSQL conversion (packages, functions, triggers, views) |
+| `step-05-azure-postgresql-setup` | Azure Bicep IaC, Docker Compose, setup docs |
+| `step-06-data-migration` | Data conversion, DMS config, validation scripts |
+| `step-07-app-adaptation` | Spring Boot app with PostgreSQL JDBC |
+| `step-08-validation` | CI/CD, integration tests, validation suite |
+
+### CLI Commands Used
+
+All steps were run from the repository root with:
+
+```bash
+copilot -p "PROMPT" --allow-all-tools --yolo 2>&1 | Tee-Object -FilePath "assets/outputs/step-NN-slug.txt"
+```
+
+#### Step 1 — Explore Oracle Database
+```bash
+copilot -p "Step 1: Explore Oracle Database. Review all files in the oracle/ directory and analyze all Oracle-specific features. Create docs/01-oracle-assessment.md cataloging all tables, sequences, packages, functions, procedures, views, triggers, queues, scheduler jobs, and synonyms with PostgreSQL equivalents." --allow-all-tools --yolo
+```
+**Output:** [`assets/outputs/step-01-explore-oracle.txt`](assets/outputs/step-01-explore-oracle.txt)
+**Created:** `docs/01-oracle-assessment.md` — Full feature catalog with migration complexity matrix
+
+#### Step 2 — Run ora2pg Assessment
+```bash
+copilot -p "Step 2: Run ora2pg Assessment. Create ora2pg/ora2pg.conf configuration and docs/02-ora2pg-assessment-report.md with migration complexity scores, conversion effort ratings, and data type mappings." --allow-all-tools --yolo
+```
+**Output:** [`assets/outputs/step-02-ora2pg-assessment.txt`](assets/outputs/step-02-ora2pg-assessment.txt)
+**Created:** `ora2pg/ora2pg.conf`, `docs/02-ora2pg-assessment-report.md`
+
+#### Step 3 — Convert Schema
+```bash
+copilot -p "Step 3: Convert Oracle Schema to PostgreSQL. Convert oracle/schema/ files to postgresql/schema/ with PostgreSQL data types, SERIAL/BIGSERIAL, CREATE SEQUENCE syntax, and synonym-to-view mappings." --allow-all-tools --yolo
+```
+**Output:** [`assets/outputs/step-03-schema-conversion.txt`](assets/outputs/step-03-schema-conversion.txt)
+**Created:** `postgresql/schema/` (5 files), `postgresql/setup.sql`
+
+#### Step 4 — Migrate PL/SQL to PL/pgSQL
+```bash
+copilot -p "Step 4: Migrate PL/SQL to PL/pgSQL. Convert all 10 packages, 3 functions, 3 procedures, 3 triggers, 4 views, Oracle AQ queue, and DBMS_SCHEDULER jobs to PostgreSQL equivalents." --allow-all-tools --yolo
+```
+**Output:** [`assets/outputs/step-04-plsql-migration.txt`](assets/outputs/step-04-plsql-migration.txt)
+**Created:** `postgresql/functions/` (13 files), `postgresql/procedures/` (3), `postgresql/triggers/` (3), `postgresql/views/` (4), `postgresql/queues/` (1), `postgresql/scheduler/` (3)
+
+#### Step 5 — Set Up Azure PostgreSQL
+```bash
+copilot -p "Step 5: Set Up Azure PostgreSQL Infrastructure. Create Bicep templates for PostgreSQL Flexible Server with extensions, DMS resource, deployment script, and update docker-compose.yml." --allow-all-tools --yolo
+```
+**Output:** [`assets/outputs/step-05-azure-postgresql-setup.txt`](assets/outputs/step-05-azure-postgresql-setup.txt)
+**Created:** `infra/main.bicep`, `infra/parameters.json`, `infra/deploy.sh`, `docs/03-azure-postgresql-setup.md`
+
+#### Step 6 — Migrate Data
+```bash
+copilot -p "Step 6: Migrate Data. Convert Oracle INSERT statements to PostgreSQL, create DMS config, and validation scripts." --allow-all-tools --yolo
+```
+**Output:** [`assets/outputs/step-06-data-migration.txt`](assets/outputs/step-06-data-migration.txt)
+**Created:** `postgresql/data/` (6 files), `scripts/validate-migration.sql`, `scripts/dms-config.json`, `docs/04-data-migration.md`
+
+#### Step 7 — Adapt Application
+```bash
+copilot -p "Step 7: Adapt Application. Create Spring Boot app with PostgreSQL JDBC, JPA entities, repositories, services, and REST controllers demonstrating the Oracle-to-PostgreSQL migration." --allow-all-tools --yolo
+```
+**Output:** [`assets/outputs/step-07-app-adaptation.txt`](assets/outputs/step-07-app-adaptation.txt)
+**Created:** `app/` (Spring Boot project with 13+ files), `docs/05-application-adaptation.md`
+
+#### Step 8 — Validate Migration
+```bash
+copilot -p "Step 8: Validate Migration. Create schema validation, function tests, integration tests, CI/CD workflow, and validation documentation." --allow-all-tools --yolo
+```
+**Output:** [`assets/outputs/step-08-validation.txt`](assets/outputs/step-08-validation.txt)
+**Created:** `scripts/validate-schema.sql`, `scripts/validate-functions.sql`, `scripts/run-validation.sh`, `tests/integration/` (5 test files), `.github/workflows/ci.yml`, `docs/06-validation-guide.md`
+
+### Key Conversion Patterns
+
+| Oracle Construct | PostgreSQL Equivalent |
+|---|---|
+| `NUMBER(n)` | `INTEGER` / `BIGINT` / `NUMERIC(n)` |
+| `VARCHAR2(n)` | `VARCHAR(n)` |
+| `CLOB` | `TEXT` |
+| `SYSDATE` | `CURRENT_TIMESTAMP` |
+| `USER` | `CURRENT_USER` |
+| `SEQ.NEXTVAL` | `nextval('seq_name')` |
+| PL/SQL Package | PL/pgSQL functions (prefixed by package name) |
+| `%TYPE` | Explicit data types |
+| `RAISE_APPLICATION_ERROR` | `RAISE EXCEPTION` |
+| `BULK COLLECT / FORALL` | Standard SQL set operations |
+| `DBMS_OUTPUT.PUT_LINE` | `RAISE NOTICE` |
+| `NVL()` | `COALESCE()` |
+| `DECODE()` | `CASE WHEN` |
+| `MONTHS_BETWEEN()` | `EXTRACT(EPOCH FROM age()) / 2592000` |
+| `TRUNC(date, 'YYYY')` | `DATE_TRUNC('year', date)` |
+| `DETERMINISTIC` | `IMMUTABLE` / `STABLE` |
+| Oracle AQ (DBMS_AQ) | pgmq extension |
+| `DBMS_SCHEDULER` | pg_cron extension |
+| Oracle Synonyms | PostgreSQL views or `search_path` |
+| Materialized View (Oracle refresh) | `CREATE MATERIALIZED VIEW` + pg_cron refresh |
