@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>SkyReward Airlines — Oracle Function: Calculate Miles</title>
+<style>
+  body { margin:0; padding:24px 32px; background:#1e1e2e; color:#cdd6f4; font-family:'Cascadia Code','Fira Code','JetBrains Mono',monospace; font-size:13px; line-height:1.55; }
+  .header { background:#313244; padding:10px 16px; border-radius:8px 8px 0 0; display:flex; align-items:center; gap:12px; }
+  .dot { width:12px; height:12px; border-radius:50%; }
+  .red { background:#f38ba8; } .yellow { background:#f9e2af; } .green { background:#a6e3a1; }
+  .title { color:#cba6f7; font-weight:bold; font-size:14px; margin-left:8px; }
+  .badge { background:#a6e3a1; color:#1e1e2e; padding:2px 8px; border-radius:4px; font-size:11px; font-weight:bold; margin-left:auto; }
+  pre { background:#181825; padding:20px 24px; border-radius:0 0 8px 8px; overflow-x:auto; margin:0; }
+  .kw { color:#cba6f7; font-weight:bold; }
+  .type { color:#89b4fa; }
+  .str { color:#a6e3a1; }
+  .num { color:#fab387; }
+  .cmt { color:#6c7086; font-style:italic; }
+  .name { color:#f9e2af; }
+  .const { color:#f38ba8; }
+  .func { color:#89dceb; }
+</style>
+</head>
+<body>
+<div class="header">
+  <span class="dot red"></span><span class="dot yellow"></span><span class="dot green"></span>
+  <span class="title">oracle/functions/fn_calculate_miles.sql</span>
+  <span class="badge">FUNCTION</span>
+</div>
+<pre>
+<span class="cmt">-- ========================================</span>
+<span class="cmt">-- Function: Calculate Miles (FN_CALCULATE_MILES)</span>
+<span class="cmt">-- DETERMINISTIC standalone function</span>
+<span class="cmt">-- Cabin × Booking Class × Tier Bonus → Total Miles</span>
+<span class="cmt">-- ========================================</span>
+
+<span class="kw">CREATE OR REPLACE FUNCTION</span> <span class="name">fn_calculate_miles</span>(
+  p_distance_miles  <span class="kw">IN</span> <span class="type">NUMBER</span>,
+  p_booking_class   <span class="kw">IN</span> <span class="type">VARCHAR2</span>,
+  p_cabin_class     <span class="kw">IN</span> <span class="type">VARCHAR2</span>,
+  p_member_tier     <span class="kw">IN</span> <span class="type">VARCHAR2</span> <span class="kw">DEFAULT</span> <span class="str">'BLUE'</span>
+) <span class="kw">RETURN</span> <span class="type">NUMBER</span>
+<span class="const">DETERMINISTIC</span>
+<span class="kw">IS</span>
+  v_cabin_mult   <span class="type">NUMBER</span>;
+  v_class_factor <span class="type">NUMBER</span>;
+  v_tier_bonus   <span class="type">NUMBER</span>;
+  v_base_miles   <span class="type">NUMBER</span>;
+<span class="kw">BEGIN</span>
+  <span class="cmt">-- Cabin class multiplier</span>
+  v_cabin_mult := <span class="kw">CASE</span> p_cabin_class
+    <span class="kw">WHEN</span> <span class="str">'ECONOMY'</span>         <span class="kw">THEN</span> <span class="num">1.0</span>
+    <span class="kw">WHEN</span> <span class="str">'PREMIUM_ECONOMY'</span> <span class="kw">THEN</span> <span class="num">1.5</span>
+    <span class="kw">WHEN</span> <span class="str">'BUSINESS'</span>        <span class="kw">THEN</span> <span class="num">2.0</span>
+    <span class="kw">WHEN</span> <span class="str">'FIRST'</span>           <span class="kw">THEN</span> <span class="num">3.0</span>
+    <span class="kw">ELSE</span> <span class="num">1.0</span>
+  <span class="kw">END</span>;
+
+  <span class="cmt">-- Booking class: Full fare 1.5x → Deep discount 0.5x</span>
+  v_class_factor := <span class="kw">CASE</span>
+    <span class="kw">WHEN</span> p_booking_class <span class="kw">IN</span> (<span class="str">'Y'</span>,<span class="str">'J'</span>,<span class="str">'F'</span>,<span class="str">'C'</span>) <span class="kw">THEN</span> <span class="num">1.5</span>
+    <span class="kw">WHEN</span> p_booking_class <span class="kw">IN</span> (<span class="str">'B'</span>,<span class="str">'M'</span>,<span class="str">'H'</span>)     <span class="kw">THEN</span> <span class="num">1.0</span>
+    <span class="kw">WHEN</span> p_booking_class <span class="kw">IN</span> (<span class="str">'Q'</span>,<span class="str">'V'</span>,<span class="str">'W'</span>)     <span class="kw">THEN</span> <span class="num">0.75</span>
+    <span class="kw">WHEN</span> p_booking_class <span class="kw">IN</span> (<span class="str">'L'</span>,<span class="str">'K'</span>,<span class="str">'N'</span>)     <span class="kw">THEN</span> <span class="num">0.5</span>
+    <span class="kw">ELSE</span> <span class="num">0.5</span>
+  <span class="kw">END</span>;
+
+  <span class="cmt">-- Tier bonus: Blue 0%, Silver 25%, Gold 50%, Platinum 75%, Diamond 100%</span>
+  v_tier_bonus := <span class="kw">CASE</span> p_member_tier
+    <span class="kw">WHEN</span> <span class="str">'BLUE'</span>     <span class="kw">THEN</span> <span class="num">0</span>
+    <span class="kw">WHEN</span> <span class="str">'SILVER'</span>   <span class="kw">THEN</span> <span class="num">25</span>
+    <span class="kw">WHEN</span> <span class="str">'GOLD'</span>     <span class="kw">THEN</span> <span class="num">50</span>
+    <span class="kw">WHEN</span> <span class="str">'PLATINUM'</span> <span class="kw">THEN</span> <span class="num">75</span>
+    <span class="kw">WHEN</span> <span class="str">'DIAMOND'</span>  <span class="kw">THEN</span> <span class="num">100</span>
+    <span class="kw">ELSE</span> <span class="num">0</span>
+  <span class="kw">END</span>;
+
+  <span class="cmt">-- Minimum 500 miles for any flight</span>
+  v_base_miles := <span class="func">GREATEST</span>(
+    <span class="func">ROUND</span>(p_distance_miles * v_cabin_mult * v_class_factor), <span class="num">500</span>
+  );
+
+  <span class="kw">RETURN</span> <span class="func">ROUND</span>(v_base_miles * (<span class="num">1</span> + v_tier_bonus / <span class="num">100</span>));
+<span class="kw">END</span> <span class="name">fn_calculate_miles</span>;
+/
+</pre>
+</body>
+</html>

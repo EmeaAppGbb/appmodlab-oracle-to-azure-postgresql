@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>SkyReward Airlines — Oracle Trigger: Flight Validation</title>
+<style>
+  body { margin:0; padding:24px 32px; background:#1e1e2e; color:#cdd6f4; font-family:'Cascadia Code','Fira Code','JetBrains Mono',monospace; font-size:13px; line-height:1.55; }
+  .header { background:#313244; padding:10px 16px; border-radius:8px 8px 0 0; display:flex; align-items:center; gap:12px; }
+  .dot { width:12px; height:12px; border-radius:50%; }
+  .red { background:#f38ba8; } .yellow { background:#f9e2af; } .green { background:#a6e3a1; }
+  .title { color:#cba6f7; font-weight:bold; font-size:14px; margin-left:8px; }
+  .badge { background:#fab387; color:#1e1e2e; padding:2px 8px; border-radius:4px; font-size:11px; font-weight:bold; margin-left:auto; }
+  pre { background:#181825; padding:20px 24px; border-radius:0 0 8px 8px; overflow-x:auto; margin:0; }
+  .kw { color:#cba6f7; font-weight:bold; }
+  .type { color:#89b4fa; }
+  .str { color:#a6e3a1; }
+  .num { color:#fab387; }
+  .cmt { color:#6c7086; font-style:italic; }
+  .name { color:#f9e2af; }
+  .const { color:#f38ba8; }
+  .func { color:#89dceb; }
+</style>
+</head>
+<body>
+<div class="header">
+  <span class="dot red"></span><span class="dot yellow"></span><span class="dot green"></span>
+  <span class="title">oracle/triggers/trg_flight_validation.sql</span>
+  <span class="badge">TRIGGER</span>
+</div>
+<pre>
+<span class="cmt">-- ========================================</span>
+<span class="cmt">-- Trigger: Flight Validation (TRG_FLIGHT_VALIDATION)</span>
+<span class="cmt">-- BEFORE INSERT/UPDATE — enforces business rules</span>
+<span class="cmt">-- Oracle-specific: :NEW/:OLD, RAISE_APPLICATION_ERROR, INSERTING</span>
+<span class="cmt">-- ========================================</span>
+
+<span class="kw">CREATE OR REPLACE TRIGGER</span> <span class="name">trg_flight_validation</span>
+  <span class="kw">BEFORE INSERT OR UPDATE ON</span> <span class="name">flights</span>
+  <span class="kw">FOR EACH ROW</span>
+<span class="kw">DECLARE</span>
+  v_member_status <span class="type">VARCHAR2(20)</span>;
+  v_dup_count     <span class="type">NUMBER</span>;
+<span class="kw">BEGIN</span>
+  <span class="cmt">-- 1. Member must be ACTIVE</span>
+  <span class="kw">SELECT</span> status <span class="kw">INTO</span> v_member_status
+  <span class="kw">FROM</span> <span class="name">members</span> <span class="kw">WHERE</span> member_id = <span class="const">:NEW</span>.member_id;
+
+  <span class="kw">IF</span> v_member_status != <span class="str">'ACTIVE'</span> <span class="kw">THEN</span>
+    <span class="const">RAISE_APPLICATION_ERROR</span>(<span class="num">-20200</span>,
+      <span class="str">'Cannot record flight for inactive member'</span>);
+  <span class="kw">END IF</span>;
+
+  <span class="cmt">-- 2. Flight date cannot be in the future</span>
+  <span class="kw">IF</span> <span class="const">:NEW</span>.flight_date &gt; <span class="func">SYSDATE</span> + <span class="num">1</span> <span class="kw">THEN</span>
+    <span class="const">RAISE_APPLICATION_ERROR</span>(<span class="num">-20202</span>,
+      <span class="str">'Flight date cannot be in the future'</span>);
+  <span class="kw">END IF</span>;
+
+  <span class="cmt">-- 3. Not older than 24 months</span>
+  <span class="kw">IF</span> <span class="const">:NEW</span>.flight_date &lt; <span class="func">ADD_MONTHS</span>(<span class="func">SYSDATE</span>, <span class="num">-24</span>) <span class="kw">THEN</span>
+    <span class="const">RAISE_APPLICATION_ERROR</span>(<span class="num">-20203</span>,
+      <span class="str">'Flight too old to process'</span>);
+  <span class="kw">END IF</span>;
+
+  <span class="cmt">-- 4. Departure ≠ Arrival</span>
+  <span class="kw">IF</span> <span class="const">:NEW</span>.departure_airport = <span class="const">:NEW</span>.arrival_airport <span class="kw">THEN</span>
+    <span class="const">RAISE_APPLICATION_ERROR</span>(<span class="num">-20204</span>,
+      <span class="str">'Departure and arrival must differ'</span>);
+  <span class="kw">END IF</span>;
+
+  <span class="cmt">-- 5. Duplicate check on INSERT</span>
+  <span class="kw">IF</span> <span class="func">INSERTING</span> <span class="kw">THEN</span>
+    <span class="kw">SELECT COUNT</span>(*) <span class="kw">INTO</span> v_dup_count
+    <span class="kw">FROM</span> <span class="name">flights</span>
+    <span class="kw">WHERE</span> member_id = <span class="const">:NEW</span>.member_id
+      <span class="kw">AND</span> flight_number = <span class="const">:NEW</span>.flight_number
+      <span class="kw">AND</span> flight_date = <span class="const">:NEW</span>.flight_date;
+    <span class="kw">IF</span> v_dup_count &gt; <span class="num">0</span> <span class="kw">THEN</span>
+      <span class="const">RAISE_APPLICATION_ERROR</span>(<span class="num">-20206</span>, <span class="str">'Duplicate flight'</span>);
+    <span class="kw">END IF</span>;
+  <span class="kw">END IF</span>;
+
+  <span class="cmt">-- 6. Normalize data to uppercase</span>
+  <span class="const">:NEW</span>.flight_number     := <span class="func">UPPER</span>(<span class="const">:NEW</span>.flight_number);
+  <span class="const">:NEW</span>.airline_code      := <span class="func">UPPER</span>(<span class="const">:NEW</span>.airline_code);
+  <span class="const">:NEW</span>.departure_airport := <span class="func">UPPER</span>(<span class="const">:NEW</span>.departure_airport);
+  <span class="const">:NEW</span>.arrival_airport   := <span class="func">UPPER</span>(<span class="const">:NEW</span>.arrival_airport);
+
+  <span class="cmt">-- 7. Enforce minimum 500 miles</span>
+  <span class="kw">IF</span> <span class="const">:NEW</span>.total_miles &lt; <span class="num">500</span> <span class="kw">THEN</span>
+    <span class="const">:NEW</span>.total_miles := <span class="num">500</span>;
+    <span class="const">:NEW</span>.base_miles  := <span class="num">500</span>;
+  <span class="kw">END IF</span>;
+
+<span class="kw">END</span> <span class="name">trg_flight_validation</span>;
+/
+</pre>
+</body>
+</html>

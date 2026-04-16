@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>SkyReward Airlines — Oracle AQ: Reward Fulfillment Queue</title>
+<style>
+  body { margin:0; padding:24px 32px; background:#1e1e2e; color:#cdd6f4; font-family:'Cascadia Code','Fira Code','JetBrains Mono',monospace; font-size:13px; line-height:1.55; }
+  .header { background:#313244; padding:10px 16px; border-radius:8px 8px 0 0; display:flex; align-items:center; gap:12px; }
+  .dot { width:12px; height:12px; border-radius:50%; }
+  .red { background:#f38ba8; } .yellow { background:#f9e2af; } .green { background:#a6e3a1; }
+  .title { color:#cba6f7; font-weight:bold; font-size:14px; margin-left:8px; }
+  .badge { background:#f9e2af; color:#1e1e2e; padding:2px 8px; border-radius:4px; font-size:11px; font-weight:bold; margin-left:auto; }
+  pre { background:#181825; padding:20px 24px; border-radius:0 0 8px 8px; overflow-x:auto; margin:0; }
+  .kw { color:#cba6f7; font-weight:bold; }
+  .type { color:#89b4fa; }
+  .str { color:#a6e3a1; }
+  .num { color:#fab387; }
+  .cmt { color:#6c7086; font-style:italic; }
+  .name { color:#f9e2af; }
+  .const { color:#f38ba8; }
+  .func { color:#89dceb; }
+</style>
+</head>
+<body>
+<div class="header">
+  <span class="dot red"></span><span class="dot yellow"></span><span class="dot green"></span>
+  <span class="title">oracle/queues/reward_fulfillment_queue.sql</span>
+  <span class="badge">ORACLE AQ</span>
+</div>
+<pre>
+<span class="cmt">-- ========================================</span>
+<span class="cmt">-- Oracle Advanced Queuing: Reward Fulfillment</span>
+<span class="cmt">-- Migration target: pgmq or Azure Service Bus</span>
+<span class="cmt">-- Uses DBMS_AQ, DBMS_AQADM, custom TYPE</span>
+<span class="cmt">-- ========================================</span>
+
+<span class="cmt">-- Custom message payload type</span>
+<span class="kw">CREATE OR REPLACE TYPE</span> <span class="name">reward_fulfillment_msg_t</span> <span class="kw">AS OBJECT</span> (
+  redemption_id     <span class="type">NUMBER(12)</span>,
+  member_id         <span class="type">NUMBER(10)</span>,
+  reward_id         <span class="type">NUMBER(10)</span>,
+  reward_code       <span class="type">VARCHAR2(30)</span>,
+  reward_name       <span class="type">VARCHAR2(200)</span>,
+  quantity          <span class="type">NUMBER(5)</span>,
+  confirmation_code <span class="type">VARCHAR2(20)</span>,
+  member_email      <span class="type">VARCHAR2(255)</span>,
+  member_name       <span class="type">VARCHAR2(200)</span>,
+  fulfillment_type  <span class="type">VARCHAR2(30)</span>,
+  priority          <span class="type">NUMBER(1)</span>,
+  enqueue_time      <span class="type">DATE</span>
+);
+/
+
+<span class="cmt">-- Create queue table and queue</span>
+<span class="kw">BEGIN</span>
+  <span class="func">DBMS_AQADM</span>.<span class="func">CREATE_QUEUE_TABLE</span>(
+    queue_table        =&gt; <span class="str">'reward_fulfillment_qt'</span>,
+    queue_payload_type =&gt; <span class="str">'reward_fulfillment_msg_t'</span>,
+    sort_list          =&gt; <span class="str">'PRIORITY,ENQ_TIME'</span>
+  );
+  <span class="func">DBMS_AQADM</span>.<span class="func">CREATE_QUEUE</span>(
+    queue_name  =&gt; <span class="str">'reward_fulfillment_q'</span>,
+    queue_table =&gt; <span class="str">'reward_fulfillment_qt'</span>,
+    max_retries =&gt; <span class="num">5</span>,
+    retry_delay =&gt; <span class="num">300</span>   <span class="cmt">-- 5 min retry</span>
+  );
+  <span class="func">DBMS_AQADM</span>.<span class="func">START_QUEUE</span>(queue_name =&gt; <span class="str">'reward_fulfillment_q'</span>);
+<span class="kw">END</span>;
+/
+
+<span class="cmt">-- Enqueue a fulfillment message</span>
+<span class="kw">CREATE OR REPLACE PROCEDURE</span> <span class="name">enqueue_fulfillment</span>(
+  p_redemption_id <span class="kw">IN</span> <span class="type">NUMBER</span>,
+  p_priority      <span class="kw">IN</span> <span class="type">NUMBER</span> <span class="kw">DEFAULT</span> <span class="num">3</span>
+) <span class="kw">IS</span>
+  v_enqueue_options    <span class="func">DBMS_AQ</span>.ENQUEUE_OPTIONS_T;
+  v_message_properties <span class="func">DBMS_AQ</span>.MESSAGE_PROPERTIES_T;
+  v_message            <span class="name">reward_fulfillment_msg_t</span>;
+<span class="kw">BEGIN</span>
+  <span class="cmt">-- Gather redemption + member + reward details</span>
+  <span class="kw">SELECT</span> ... <span class="kw">INTO</span> ... <span class="kw">FROM</span> <span class="name">redemptions</span> r
+  <span class="kw">JOIN</span> <span class="name">rewards</span> rw <span class="kw">ON</span> r.reward_id = rw.reward_id
+  <span class="kw">JOIN</span> <span class="name">members</span> m  <span class="kw">ON</span> r.member_id = m.member_id;
+
+  v_message_properties.priority   := p_priority;
+  v_message_properties.expiration := <span class="num">86400</span>;  <span class="cmt">-- 24h</span>
+
+  <span class="func">DBMS_AQ</span>.<span class="func">ENQUEUE</span>(
+    queue_name         =&gt; <span class="str">'reward_fulfillment_q'</span>,
+    enqueue_options    =&gt; v_enqueue_options,
+    message_properties =&gt; v_message_properties,
+    payload            =&gt; v_message,
+    msgid              =&gt; v_message_handle
+  );
+  <span class="kw">COMMIT</span>;
+<span class="kw">END</span>;
+/
+
+<span class="cmt">-- Dequeue loop — process and fulfill rewards</span>
+<span class="kw">CREATE OR REPLACE PROCEDURE</span> <span class="name">dequeue_and_fulfill</span> <span class="kw">IS</span>
+<span class="kw">BEGIN</span>
+  <span class="kw">LOOP</span>
+    <span class="func">DBMS_AQ</span>.<span class="func">DEQUEUE</span>( ... );
+    <span class="kw">UPDATE</span> <span class="name">redemptions</span> <span class="kw">SET</span> status = <span class="str">'FULFILLED'</span>;
+    <span class="name">pkg_notification</span>.<span class="func">send_notification</span>( ... );
+    <span class="kw">COMMIT</span>;
+  <span class="kw">END LOOP</span>;
+<span class="kw">END</span>;
+/
+</pre>
+</body>
+</html>

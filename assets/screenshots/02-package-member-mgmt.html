@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>SkyReward Airlines — PL/SQL Package: Member Management</title>
+<style>
+  body { margin:0; padding:24px 32px; background:#1e1e2e; color:#cdd6f4; font-family:'Cascadia Code','Fira Code','JetBrains Mono',monospace; font-size:13px; line-height:1.55; }
+  .header { background:#313244; padding:10px 16px; border-radius:8px 8px 0 0; display:flex; align-items:center; gap:12px; }
+  .dot { width:12px; height:12px; border-radius:50%; }
+  .red { background:#f38ba8; } .yellow { background:#f9e2af; } .green { background:#a6e3a1; }
+  .title { color:#cba6f7; font-weight:bold; font-size:14px; margin-left:8px; }
+  .badge { background:#f38ba8; color:#1e1e2e; padding:2px 8px; border-radius:4px; font-size:11px; font-weight:bold; margin-left:auto; }
+  pre { background:#181825; padding:20px 24px; border-radius:0 0 8px 8px; overflow-x:auto; margin:0; }
+  .kw { color:#cba6f7; font-weight:bold; }
+  .type { color:#89b4fa; }
+  .str { color:#a6e3a1; }
+  .num { color:#fab387; }
+  .cmt { color:#6c7086; font-style:italic; }
+  .name { color:#f9e2af; }
+  .const { color:#f38ba8; }
+  .func { color:#89dceb; }
+</style>
+</head>
+<body>
+<div class="header">
+  <span class="dot red"></span><span class="dot yellow"></span><span class="dot green"></span>
+  <span class="title">oracle/packages/pkg_member_mgmt.sql</span>
+  <span class="badge">PL/SQL PACKAGE</span>
+</div>
+<pre>
+<span class="cmt">-- ========================================</span>
+<span class="cmt">-- Package: Member Management (PKG_MEMBER_MGMT)</span>
+<span class="cmt">-- Handles registration, profile updates, account management</span>
+<span class="cmt">-- ========================================</span>
+
+<span class="kw">CREATE OR REPLACE PACKAGE</span> <span class="name">pkg_member_mgmt</span> <span class="kw">AS</span>
+
+  <span class="cmt">-- Custom record type</span>
+  <span class="kw">TYPE</span> <span class="type">t_member_rec</span> <span class="kw">IS RECORD</span> (
+    member_id         members.member_id<span class="kw">%TYPE</span>,
+    membership_number members.membership_number<span class="kw">%TYPE</span>,
+    first_name        members.first_name<span class="kw">%TYPE</span>,
+    last_name         members.last_name<span class="kw">%TYPE</span>,
+    email             members.email<span class="kw">%TYPE</span>,
+    tier_status       members.tier_status<span class="kw">%TYPE</span>,
+    available_miles   members.available_miles<span class="kw">%TYPE</span>
+  );
+
+  <span class="kw">TYPE</span> <span class="type">t_member_tab</span> <span class="kw">IS TABLE OF</span> <span class="type">t_member_rec</span> <span class="kw">INDEX BY</span> <span class="type">PLS_INTEGER</span>;
+
+  <span class="kw">PROCEDURE</span> <span class="func">register_member</span>(
+    p_first_name <span class="kw">IN</span> <span class="type">VARCHAR2</span>, p_last_name <span class="kw">IN</span> <span class="type">VARCHAR2</span>,
+    p_email      <span class="kw">IN</span> <span class="type">VARCHAR2</span>, p_member_id <span class="kw">OUT</span> <span class="type">NUMBER</span>,
+    p_membership_num <span class="kw">OUT</span> <span class="type">VARCHAR2</span>
+  );
+
+  <span class="kw">FUNCTION</span>  <span class="func">get_member</span>(p_member_id <span class="kw">IN</span> <span class="type">NUMBER</span>) <span class="kw">RETURN</span> <span class="type">t_member_rec</span>;
+  <span class="kw">FUNCTION</span>  <span class="func">search_members</span>(p_last_name <span class="kw">IN</span> <span class="type">VARCHAR2</span>) <span class="kw">RETURN</span> <span class="type">t_member_tab</span>;
+  <span class="kw">PROCEDURE</span> <span class="func">update_miles_balance</span>(p_member_id <span class="kw">IN</span> <span class="type">NUMBER</span>, p_miles_delta <span class="kw">IN</span> <span class="type">NUMBER</span>);
+  <span class="kw">PROCEDURE</span> <span class="func">merge_members</span>(p_keep_member_id <span class="kw">IN</span> <span class="type">NUMBER</span>, p_merge_member_id <span class="kw">IN</span> <span class="type">NUMBER</span>);
+
+<span class="kw">END</span> <span class="name">pkg_member_mgmt</span>;
+/
+
+<span class="kw">CREATE OR REPLACE PACKAGE BODY</span> <span class="name">pkg_member_mgmt</span> <span class="kw">AS</span>
+
+  <span class="cmt">-- Generate membership number: SR + year + sequence</span>
+  <span class="kw">FUNCTION</span> <span class="func">generate_membership_number</span> <span class="kw">RETURN</span> <span class="type">VARCHAR2</span> <span class="kw">IS</span>
+    v_num <span class="type">VARCHAR2(20)</span>;
+  <span class="kw">BEGIN</span>
+    v_num := <span class="str">'SR'</span> || <span class="func">TO_CHAR</span>(<span class="func">SYSDATE</span>, <span class="str">'YY'</span>) || <span class="func">LPAD</span>(seq_member_id.<span class="func">NEXTVAL</span>, <span class="num">8</span>, <span class="str">'0'</span>);
+    <span class="kw">RETURN</span> v_num;
+  <span class="kw">END</span>;
+
+  <span class="cmt">-- Register new member with email validation</span>
+  <span class="kw">PROCEDURE</span> <span class="func">register_member</span>( ... ) <span class="kw">IS</span>
+    v_email_count <span class="type">NUMBER</span>;
+  <span class="kw">BEGIN</span>
+    <span class="kw">SELECT COUNT</span>(*) <span class="kw">INTO</span> v_email_count
+    <span class="kw">FROM</span> <span class="name">members</span> <span class="kw">WHERE</span> email = <span class="func">LOWER</span>(p_email);
+
+    <span class="kw">IF</span> v_email_count &gt; <span class="num">0</span> <span class="kw">THEN</span>
+      <span class="const">RAISE_APPLICATION_ERROR</span>(<span class="num">-20001</span>, <span class="str">'Email already registered'</span>);
+    <span class="kw">END IF</span>;
+
+    <span class="kw">INSERT INTO</span> <span class="name">members</span> (...) <span class="kw">VALUES</span> (
+      p_member_id, p_membership_num,
+      <span class="func">INITCAP</span>(p_first_name), <span class="func">INITCAP</span>(p_last_name),
+      <span class="func">LOWER</span>(p_email), c_default_tier, <span class="func">SYSDATE</span>,
+      <span class="func">ADD_MONTHS</span>(<span class="func">SYSDATE</span>, <span class="num">12</span>), <span class="str">'ACTIVE'</span>
+    );
+    <span class="name">pkg_audit</span>.<span class="func">log_change</span>(<span class="str">'MEMBERS'</span>, <span class="str">'INSERT'</span>, ...);
+    <span class="kw">COMMIT</span>;
+  <span class="kw">EXCEPTION WHEN OTHERS THEN ROLLBACK; RAISE;</span>
+  <span class="kw">END</span>;
+
+  <span class="cmt">-- Merge duplicate accounts — transfers flights, redemptions, miles</span>
+  <span class="kw">PROCEDURE</span> <span class="func">merge_members</span>( ... ) <span class="kw">IS</span>
+  <span class="kw">BEGIN</span>
+    <span class="kw">UPDATE</span> <span class="name">flights</span>      <span class="kw">SET</span> member_id = p_keep_member_id ...;
+    <span class="kw">UPDATE</span> <span class="name">redemptions</span>  <span class="kw">SET</span> member_id = p_keep_member_id ...;
+    <span class="kw">UPDATE</span> <span class="name">members</span>      <span class="kw">SET</span> available_miles = available_miles + v_merge_miles ...;
+    <span class="kw">UPDATE</span> <span class="name">members</span>      <span class="kw">SET</span> status = <span class="str">'CLOSED'</span> <span class="kw">WHERE</span> member_id = p_merge_member_id;
+    <span class="kw">COMMIT</span>;
+  <span class="kw">END</span>;
+
+<span class="kw">END</span> <span class="name">pkg_member_mgmt</span>;
+/
+</pre>
+</body>
+</html>

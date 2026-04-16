@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>SkyReward Airlines — Oracle Schema: Tables</title>
+<style>
+  body { margin:0; padding:24px 32px; background:#1e1e2e; color:#cdd6f4; font-family:'Cascadia Code','Fira Code','JetBrains Mono',monospace; font-size:13px; line-height:1.55; }
+  .header { background:#313244; padding:10px 16px; border-radius:8px 8px 0 0; display:flex; align-items:center; gap:12px; }
+  .dot { width:12px; height:12px; border-radius:50%; }
+  .red { background:#f38ba8; } .yellow { background:#f9e2af; } .green { background:#a6e3a1; }
+  .title { color:#cba6f7; font-weight:bold; font-size:14px; margin-left:8px; }
+  .badge { background:#89b4fa; color:#1e1e2e; padding:2px 8px; border-radius:4px; font-size:11px; font-weight:bold; margin-left:auto; }
+  pre { background:#181825; padding:20px 24px; border-radius:0 0 8px 8px; overflow-x:auto; margin:0; }
+  .kw { color:#cba6f7; font-weight:bold; }
+  .type { color:#89b4fa; }
+  .str { color:#a6e3a1; }
+  .num { color:#fab387; }
+  .cmt { color:#6c7086; font-style:italic; }
+  .name { color:#f9e2af; }
+  .const { color:#f38ba8; }
+  .func { color:#89dceb; }
+  .op { color:#94e2d5; }
+</style>
+</head>
+<body>
+<div class="header">
+  <span class="dot red"></span><span class="dot yellow"></span><span class="dot green"></span>
+  <span class="title">oracle/schema/02_tables.sql</span>
+  <span class="badge">ORACLE 19c DDL</span>
+</div>
+<pre>
+<span class="cmt">-- ========================================</span>
+<span class="cmt">-- SkyReward Airlines — Core Tables (Oracle 19c)</span>
+<span class="cmt">-- Oracle-specific: NUMBER, VARCHAR2, DATE, CLOB, SYSDATE, USER</span>
+<span class="cmt">-- ========================================</span>
+
+<span class="kw">CREATE TABLE</span> <span class="name">members</span> (
+  member_id         <span class="type">NUMBER(10)</span>      <span class="const">NOT NULL</span>,
+  membership_number <span class="type">VARCHAR2(20)</span>    <span class="const">NOT NULL</span>,
+  first_name        <span class="type">VARCHAR2(100)</span>   <span class="const">NOT NULL</span>,
+  last_name         <span class="type">VARCHAR2(100)</span>   <span class="const">NOT NULL</span>,
+  email             <span class="type">VARCHAR2(255)</span>   <span class="const">NOT NULL</span>,
+  phone             <span class="type">VARCHAR2(30)</span>,
+  date_of_birth     <span class="type">DATE</span>,
+  tier_status       <span class="type">VARCHAR2(20)</span>    <span class="kw">DEFAULT</span> <span class="str">'BLUE'</span>,
+  total_miles       <span class="type">NUMBER(12)</span>      <span class="kw">DEFAULT</span> <span class="num">0</span>,
+  available_miles   <span class="type">NUMBER(12)</span>      <span class="kw">DEFAULT</span> <span class="num">0</span>,
+  ytd_miles         <span class="type">NUMBER(12)</span>      <span class="kw">DEFAULT</span> <span class="num">0</span>,
+  lifetime_miles    <span class="type">NUMBER(15)</span>      <span class="kw">DEFAULT</span> <span class="num">0</span>,
+  enrollment_date   <span class="type">DATE</span>            <span class="kw">DEFAULT</span> <span class="func">SYSDATE</span>,
+  tier_expiry_date  <span class="type">DATE</span>,
+  status            <span class="type">VARCHAR2(20)</span>    <span class="kw">DEFAULT</span> <span class="str">'ACTIVE'</span>,
+  notes             <span class="type">CLOB</span>,
+  created_date      <span class="type">DATE</span>            <span class="kw">DEFAULT</span> <span class="func">SYSDATE</span>,
+  updated_by        <span class="type">VARCHAR2(50)</span>    <span class="kw">DEFAULT</span> <span class="func">USER</span>,
+  <span class="kw">CONSTRAINT</span> <span class="name">pk_members</span> <span class="kw">PRIMARY KEY</span> (member_id),
+  <span class="kw">CONSTRAINT</span> <span class="name">uk_members_email</span> <span class="kw">UNIQUE</span> (email),
+  <span class="kw">CONSTRAINT</span> <span class="name">chk_members_tier</span> <span class="kw">CHECK</span> (tier_status <span class="kw">IN</span> (<span class="str">'BLUE'</span>,<span class="str">'SILVER'</span>,<span class="str">'GOLD'</span>,<span class="str">'PLATINUM'</span>,<span class="str">'DIAMOND'</span>)),
+  <span class="kw">CONSTRAINT</span> <span class="name">chk_members_status</span> <span class="kw">CHECK</span> (status <span class="kw">IN</span> (<span class="str">'ACTIVE'</span>,<span class="str">'INACTIVE'</span>,<span class="str">'SUSPENDED'</span>,<span class="str">'CLOSED'</span>))
+);
+
+<span class="kw">CREATE TABLE</span> <span class="name">flights</span> (
+  flight_id         <span class="type">NUMBER(12)</span>      <span class="const">NOT NULL</span>,
+  member_id         <span class="type">NUMBER(10)</span>      <span class="const">NOT NULL</span>,
+  flight_number     <span class="type">VARCHAR2(10)</span>    <span class="const">NOT NULL</span>,
+  cabin_class       <span class="type">VARCHAR2(20)</span>    <span class="const">NOT NULL</span>,
+  distance_miles    <span class="type">NUMBER(8)</span>       <span class="const">NOT NULL</span>,
+  base_miles        <span class="type">NUMBER(8)</span>       <span class="const">NOT NULL</span>,
+  bonus_miles       <span class="type">NUMBER(8)</span>       <span class="kw">DEFAULT</span> <span class="num">0</span>,
+  fare_amount       <span class="type">NUMBER(10,2)</span>,
+  accrual_status    <span class="type">VARCHAR2(20)</span>    <span class="kw">DEFAULT</span> <span class="str">'PENDING'</span>,
+  <span class="kw">CONSTRAINT</span> <span class="name">pk_flights</span> <span class="kw">PRIMARY KEY</span> (flight_id),
+  <span class="kw">CONSTRAINT</span> <span class="name">fk_flights_member</span> <span class="kw">FOREIGN KEY</span> (member_id) <span class="kw">REFERENCES</span> <span class="name">members</span>(member_id),
+  <span class="kw">CONSTRAINT</span> <span class="name">chk_flights_cabin</span> <span class="kw">CHECK</span> (cabin_class <span class="kw">IN</span> (<span class="str">'ECONOMY'</span>,<span class="str">'PREMIUM_ECONOMY'</span>,<span class="str">'BUSINESS'</span>,<span class="str">'FIRST'</span>))
+);
+
+<span class="kw">CREATE TABLE</span> <span class="name">redemptions</span> (
+  redemption_id     <span class="type">NUMBER(12)</span>      <span class="const">NOT NULL</span>,
+  member_id         <span class="type">NUMBER(10)</span>      <span class="const">NOT NULL</span>,
+  reward_id         <span class="type">NUMBER(10)</span>      <span class="const">NOT NULL</span>,
+  miles_used        <span class="type">NUMBER(10)</span>      <span class="const">NOT NULL</span>,
+  status            <span class="type">VARCHAR2(20)</span>    <span class="kw">DEFAULT</span> <span class="str">'PENDING'</span>,
+  <span class="kw">CONSTRAINT</span> <span class="name">pk_redemptions</span> <span class="kw">PRIMARY KEY</span> (redemption_id),
+  <span class="kw">CONSTRAINT</span> <span class="name">fk_redemptions_member</span> <span class="kw">FOREIGN KEY</span> (member_id) <span class="kw">REFERENCES</span> <span class="name">members</span>(member_id)
+);
+
+<span class="cmt">-- + 7 more tables: rewards, partners, partner_transactions,</span>
+<span class="cmt">--   tier_rules, miles_expiry, audit_log, notifications,</span>
+<span class="cmt">--   batch_processing_log</span>
+</pre>
+</body>
+</html>

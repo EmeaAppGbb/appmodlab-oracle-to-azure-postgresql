@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>SkyReward Airlines — Oracle Procedure: Expire Miles</title>
+<style>
+  body { margin:0; padding:24px 32px; background:#1e1e2e; color:#cdd6f4; font-family:'Cascadia Code','Fira Code','JetBrains Mono',monospace; font-size:13px; line-height:1.55; }
+  .header { background:#313244; padding:10px 16px; border-radius:8px 8px 0 0; display:flex; align-items:center; gap:12px; }
+  .dot { width:12px; height:12px; border-radius:50%; }
+  .red { background:#f38ba8; } .yellow { background:#f9e2af; } .green { background:#a6e3a1; }
+  .title { color:#cba6f7; font-weight:bold; font-size:14px; margin-left:8px; }
+  .badge { background:#cba6f7; color:#1e1e2e; padding:2px 8px; border-radius:4px; font-size:11px; font-weight:bold; margin-left:auto; }
+  pre { background:#181825; padding:20px 24px; border-radius:0 0 8px 8px; overflow-x:auto; margin:0; }
+  .kw { color:#cba6f7; font-weight:bold; }
+  .type { color:#89b4fa; }
+  .str { color:#a6e3a1; }
+  .num { color:#fab387; }
+  .cmt { color:#6c7086; font-style:italic; }
+  .name { color:#f9e2af; }
+  .const { color:#f38ba8; }
+  .func { color:#89dceb; }
+</style>
+</head>
+<body>
+<div class="header">
+  <span class="dot red"></span><span class="dot yellow"></span><span class="dot green"></span>
+  <span class="title">oracle/procedures/pr_expire_miles.sql</span>
+  <span class="badge">STORED PROCEDURE</span>
+</div>
+<pre>
+<span class="cmt">-- ========================================</span>
+<span class="cmt">-- Procedure: Expire Miles (PR_EXPIRE_MILES)</span>
+<span class="cmt">-- Batch job to expire inactive miles</span>
+<span class="cmt">-- Oracle-specific: %TYPE, INDEX BY, cursor FOR loop, DBMS_OUTPUT</span>
+<span class="cmt">-- ========================================</span>
+
+<span class="kw">CREATE OR REPLACE PROCEDURE</span> <span class="name">pr_expire_miles</span>(
+  p_run_date      <span class="kw">IN</span>  <span class="type">DATE</span> <span class="kw">DEFAULT</span> <span class="func">SYSDATE</span>,
+  p_batch_id      <span class="kw">OUT</span> <span class="type">NUMBER</span>,
+  p_expired_count <span class="kw">OUT</span> <span class="type">NUMBER</span>,
+  p_total_miles   <span class="kw">OUT</span> <span class="type">NUMBER</span>
+) <span class="kw">IS</span>
+  <span class="kw">TYPE</span> <span class="type">t_expiry_rec</span> <span class="kw">IS RECORD</span> (
+    expiry_id       miles_expiry.expiry_id<span class="kw">%TYPE</span>,
+    member_id       miles_expiry.member_id<span class="kw">%TYPE</span>,
+    miles_to_expire <span class="type">NUMBER</span>
+  );
+  <span class="kw">TYPE</span> <span class="type">t_expiry_tab</span> <span class="kw">IS TABLE OF</span> <span class="type">t_expiry_rec</span> <span class="kw">INDEX BY</span> <span class="type">PLS_INTEGER</span>;
+  v_data <span class="type">t_expiry_tab</span>;
+<span class="kw">BEGIN</span>
+  p_batch_id := <span class="name">pkg_batch_processing</span>.<span class="func">start_batch</span>(
+    <span class="str">'MILES_EXPIRY'</span>, <span class="str">'Scheduled Miles Expiry'</span>);
+
+  <span class="cmt">-- Collect expiring miles records via cursor FOR loop</span>
+  <span class="kw">FOR</span> rec <span class="kw">IN</span> (
+    <span class="kw">SELECT</span> expiry_id, member_id,
+           (miles_amount - expired_miles) <span class="kw">AS</span> miles_to_expire
+    <span class="kw">FROM</span> <span class="name">miles_expiry</span>
+    <span class="kw">WHERE</span> status = <span class="str">'ACTIVE'</span>
+      <span class="kw">AND</span> expiry_date &lt;= p_run_date
+      <span class="kw">AND</span> miles_amount &gt; expired_miles
+  ) <span class="kw">LOOP</span>
+    <span class="cmt">-- Mark as expired</span>
+    <span class="kw">UPDATE</span> <span class="name">miles_expiry</span> <span class="kw">SET</span>
+      status = <span class="str">'EXPIRED'</span>, batch_id = p_batch_id,
+      processed_date = <span class="func">SYSDATE</span>
+    <span class="kw">WHERE</span> expiry_id = rec.expiry_id;
+
+    <span class="cmt">-- Deduct from member balance</span>
+    <span class="kw">UPDATE</span> <span class="name">members</span> <span class="kw">SET</span>
+      available_miles = <span class="func">GREATEST</span>(available_miles - rec.miles_to_expire, <span class="num">0</span>)
+    <span class="kw">WHERE</span> member_id = rec.member_id;
+
+    <span class="cmt">-- Notify member of expiration</span>
+    <span class="name">pkg_notification</span>.<span class="func">send_notification</span>(
+      rec.member_id, <span class="str">'MILES_EXPIRY'</span>,
+      <span class="str">'Miles Expiration Notice'</span>,
+      <span class="func">TO_CHAR</span>(rec.miles_to_expire, <span class="str">'999,999'</span>) ||
+      <span class="str">' miles have expired from your account.'</span>
+    );
+
+    p_expired_count := p_expired_count + <span class="num">1</span>;
+    p_total_miles   := p_total_miles + rec.miles_to_expire;
+
+    <span class="cmt">-- Commit every 1000 records</span>
+    <span class="kw">IF</span> <span class="func">MOD</span>(p_expired_count, <span class="num">1000</span>) = <span class="num">0</span> <span class="kw">THEN COMMIT; END IF</span>;
+  <span class="kw">END LOOP</span>;
+
+  <span class="name">pkg_batch_processing</span>.<span class="func">complete_batch</span>(p_batch_id, p_expired_count, p_expired_count, <span class="num">0</span>);
+  <span class="kw">COMMIT</span>;
+
+  <span class="func">DBMS_OUTPUT</span>.<span class="func">PUT_LINE</span>(<span class="str">'Expired '</span> || p_expired_count || <span class="str">' records, '</span> || p_total_miles || <span class="str">' miles'</span>);
+<span class="kw">EXCEPTION WHEN OTHERS THEN ROLLBACK; RAISE;</span>
+<span class="kw">END</span> <span class="name">pr_expire_miles</span>;
+/
+</pre>
+</body>
+</html>

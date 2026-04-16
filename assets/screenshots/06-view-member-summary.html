@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>SkyReward Airlines — Oracle View: Member Summary</title>
+<style>
+  body { margin:0; padding:24px 32px; background:#1e1e2e; color:#cdd6f4; font-family:'Cascadia Code','Fira Code','JetBrains Mono',monospace; font-size:13px; line-height:1.55; }
+  .header { background:#313244; padding:10px 16px; border-radius:8px 8px 0 0; display:flex; align-items:center; gap:12px; }
+  .dot { width:12px; height:12px; border-radius:50%; }
+  .red { background:#f38ba8; } .yellow { background:#f9e2af; } .green { background:#a6e3a1; }
+  .title { color:#cba6f7; font-weight:bold; font-size:14px; margin-left:8px; }
+  .badge { background:#89dceb; color:#1e1e2e; padding:2px 8px; border-radius:4px; font-size:11px; font-weight:bold; margin-left:auto; }
+  pre { background:#181825; padding:20px 24px; border-radius:0 0 8px 8px; overflow-x:auto; margin:0; }
+  .kw { color:#cba6f7; font-weight:bold; }
+  .type { color:#89b4fa; }
+  .str { color:#a6e3a1; }
+  .num { color:#fab387; }
+  .cmt { color:#6c7086; font-style:italic; }
+  .name { color:#f9e2af; }
+  .const { color:#f38ba8; }
+  .func { color:#89dceb; }
+</style>
+</head>
+<body>
+<div class="header">
+  <span class="dot red"></span><span class="dot yellow"></span><span class="dot green"></span>
+  <span class="title">oracle/views/vw_member_summary.sql</span>
+  <span class="badge">VIEW</span>
+</div>
+<pre>
+<span class="cmt">-- ========================================</span>
+<span class="cmt">-- View: Member Summary (VW_MEMBER_SUMMARY)</span>
+<span class="cmt">-- Oracle-specific: MONTHS_BETWEEN, DECODE, TRUNC(..,'YYYY'),</span>
+<span class="cmt">--                  RANK() OVER, NVL, string concatenation (||)</span>
+<span class="cmt">-- ========================================</span>
+
+<span class="kw">CREATE OR REPLACE VIEW</span> <span class="name">vw_member_summary</span> <span class="kw">AS</span>
+<span class="kw">SELECT</span>
+  m.member_id,
+  m.membership_number,
+  m.first_name || <span class="str">' '</span> || m.last_name <span class="kw">AS</span> member_name,
+  m.tier_status,
+  m.available_miles,
+  m.lifetime_miles,
+
+  <span class="cmt">-- Oracle MONTHS_BETWEEN for membership duration</span>
+  <span class="func">ROUND</span>(<span class="func">MONTHS_BETWEEN</span>(<span class="func">SYSDATE</span>, m.enrollment_date)) <span class="kw">AS</span> membership_months,
+
+  <span class="cmt">-- Flight statistics (aggregated subquery)</span>
+  <span class="func">NVL</span>(f.total_flights, <span class="num">0</span>)      <span class="kw">AS</span> total_flights,
+  <span class="func">NVL</span>(f.total_flight_miles, <span class="num">0</span>) <span class="kw">AS</span> total_flight_miles,
+
+  <span class="cmt">-- Redemption statistics</span>
+  <span class="func">NVL</span>(r.total_redemptions, <span class="num">0</span>)     <span class="kw">AS</span> total_redemptions,
+  <span class="func">NVL</span>(r.total_miles_redeemed, <span class="num">0</span>) <span class="kw">AS</span> total_miles_redeemed,
+
+  <span class="cmt">-- Oracle DECODE for tier display stars</span>
+  <span class="func">DECODE</span>(m.tier_status,
+    <span class="str">'DIAMOND'</span>,  <span class="str">'★★★★★'</span>,
+    <span class="str">'PLATINUM'</span>, <span class="str">'★★★★'</span>,
+    <span class="str">'GOLD'</span>,     <span class="str">'★★★'</span>,
+    <span class="str">'SILVER'</span>,   <span class="str">'★★'</span>,
+    <span class="str">'BLUE'</span>,     <span class="str">'★'</span>
+  ) <span class="kw">AS</span> tier_stars,
+
+  <span class="cmt">-- Days until tier expiry</span>
+  <span class="func">TRUNC</span>(m.tier_expiry_date - <span class="func">SYSDATE</span>) <span class="kw">AS</span> days_until_tier_expiry,
+
+  <span class="cmt">-- Oracle analytic: rank within tier</span>
+  <span class="func">RANK</span>() <span class="kw">OVER</span> (
+    <span class="kw">PARTITION BY</span> m.tier_status
+    <span class="kw">ORDER BY</span> m.lifetime_miles <span class="kw">DESC</span>
+  ) <span class="kw">AS</span> tier_rank
+
+<span class="kw">FROM</span> <span class="name">members</span> m
+<span class="kw">LEFT JOIN</span> (
+  <span class="kw">SELECT</span> member_id,
+         <span class="func">COUNT</span>(*) <span class="kw">AS</span> total_flights,
+         <span class="func">SUM</span>(total_miles) <span class="kw">AS</span> total_flight_miles
+  <span class="kw">FROM</span> <span class="name">flights</span>
+  <span class="kw">WHERE</span> accrual_status = <span class="str">'PROCESSED'</span>
+  <span class="kw">GROUP BY</span> member_id
+) f <span class="kw">ON</span> m.member_id = f.member_id
+<span class="kw">LEFT JOIN</span> (
+  <span class="kw">SELECT</span> member_id,
+         <span class="func">COUNT</span>(*) <span class="kw">AS</span> total_redemptions,
+         <span class="func">SUM</span>(miles_used) <span class="kw">AS</span> total_miles_redeemed
+  <span class="kw">FROM</span> <span class="name">redemptions</span>
+  <span class="kw">WHERE</span> status <span class="kw">IN</span> (<span class="str">'CONFIRMED'</span>, <span class="str">'FULFILLED'</span>)
+  <span class="kw">GROUP BY</span> member_id
+) r <span class="kw">ON</span> m.member_id = r.member_id
+<span class="kw">WHERE</span> m.status != <span class="str">'CLOSED'</span>;
+</pre>
+</body>
+</html>
