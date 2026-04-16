@@ -1,0 +1,210 @@
+{
+  "migrationService": {
+    "name": "skyreward-ora2pg-dms",
+    "resourceGroup": "rg-skyreward-migration",
+    "location": "eastus",
+    "sku": "Premium_4vCores"
+  },
+  "sourceConnection": {
+    "type": "Oracle",
+    "host": "${ORACLE_HOST}",
+    "port": 1521,
+    "serviceName": "${ORACLE_SERVICE_NAME}",
+    "authentication": {
+      "userName": "${ORACLE_USER}",
+      "password": "${ORACLE_PASSWORD}"
+    },
+    "ssl": {
+      "enabled": true,
+      "trustServerCertificate": false,
+      "caFilePath": "/certs/oracle-ca.pem"
+    }
+  },
+  "targetConnection": {
+    "type": "PostgreSQL",
+    "serverName": "${PG_SERVER}.postgres.database.azure.com",
+    "port": 5432,
+    "databaseName": "${PG_DATABASE}",
+    "authentication": {
+      "userName": "${PG_USER}@${PG_SERVER}",
+      "password": "${PG_PASSWORD}"
+    },
+    "ssl": {
+      "enabled": true,
+      "sslMode": "require"
+    }
+  },
+  "migrationProject": {
+    "name": "skyreward-oracle-to-postgresql",
+    "sourcePlatform": "Oracle",
+    "targetPlatform": "AzureDbForPostgreSql"
+  },
+  "tableMappings": {
+    "rules": [
+      {
+        "ruleType": "Include",
+        "sourceSchema": "SKYREWARD",
+        "targetSchema": "public",
+        "tables": [
+          {
+            "sourceTable": "TIER_RULES",
+            "targetTable": "tier_rules",
+            "columnMappings": [
+              { "source": "RULE_ID",                "target": "rule_id" },
+              { "source": "TIER_NAME",              "target": "tier_name" },
+              { "source": "MIN_QUALIFYING_MILES",   "target": "min_miles" },
+              { "source": "MIN_QUALIFYING_SEGMENTS", "target": "min_segments" },
+              { "source": "BONUS_MULTIPLIER",       "target": "miles_multiplier" }
+            ],
+            "notes": "benefits TEXT column decomposed into individual boolean/int columns in PG"
+          },
+          {
+            "sourceTable": "REWARDS",
+            "targetTable": "rewards",
+            "columnMappings": [
+              { "source": "REWARD_ID",     "target": "reward_id" },
+              { "source": "NAME",          "target": "reward_name" },
+              { "source": "DESCRIPTION",   "target": "description" },
+              { "source": "CATEGORY",      "target": "category" },
+              { "source": "MILES_REQUIRED","target": "miles_required" },
+              { "source": "AVAILABILITY",  "target": "quantity_available" },
+              { "source": "STATUS",        "target": "status" }
+            ],
+            "notes": "reward_code must be generated during migration; STATUS AVAILABLE->ACTIVE, LIMITED->ACTIVE"
+          },
+          {
+            "sourceTable": "MEMBERS",
+            "targetTable": "members",
+            "columnMappings": [
+              { "source": "MEMBER_ID",           "target": "member_id" },
+              { "source": "FIRST_NAME",          "target": "first_name" },
+              { "source": "LAST_NAME",           "target": "last_name" },
+              { "source": "EMAIL",               "target": "email" },
+              { "source": "PHONE",               "target": "phone" },
+              { "source": "TIER_STATUS",         "target": "tier_status" },
+              { "source": "TOTAL_MILES",         "target": "total_miles" },
+              { "source": "QUALIFYING_MILES",    "target": "ytd_miles" },
+              { "source": "LIFETIME_MILES",      "target": "lifetime_miles" },
+              { "source": "JOIN_DATE",           "target": "enrollment_date" },
+              { "source": "STATUS",              "target": "status" },
+              { "source": "CITY",                "target": "city" },
+              { "source": "STATE",               "target": "state_province" },
+              { "source": "COUNTRY",             "target": "country" }
+            ],
+            "notes": "membership_number must be generated as 'SR' + LPAD(member_id, 8, '0'); available_miles derived from total_miles"
+          },
+          {
+            "sourceTable": "PARTNERS",
+            "targetTable": "partners",
+            "columnMappings": [
+              { "source": "PARTNER_ID",    "target": "partner_id" },
+              { "source": "PARTNER_NAME",  "target": "partner_name" },
+              { "source": "PARTNER_TYPE",  "target": "partner_type" },
+              { "source": "EARN_RATE",     "target": "conversion_rate" },
+              { "source": "STATUS",        "target": "status" },
+              { "source": "CONTRACT_START","target": "agreement_start" }
+            ],
+            "notes": "partner_code must be generated; CREDIT_CARD->FINANCIAL type mapping"
+          },
+          {
+            "sourceTable": "FLIGHTS",
+            "targetTable": "flights",
+            "columnMappings": [
+              { "source": "FLIGHT_ID",              "target": "flight_id" },
+              { "source": "MEMBER_ID",              "target": "member_id" },
+              { "source": "FLIGHT_NUMBER",          "target": "flight_number" },
+              { "source": "ORIGIN",                 "target": "departure_airport" },
+              { "source": "DESTINATION",            "target": "arrival_airport" },
+              { "source": "TRAVEL_DATE",            "target": "flight_date" },
+              { "source": "BOOKING_CLASS",          "target": "booking_class" },
+              { "source": "DISTANCE_MILES",         "target": "distance_miles" },
+              { "source": "MILES_EARNED",           "target": "total_miles" },
+              { "source": "QUALIFYING_MILES_EARNED","target": "tier_miles" },
+              { "source": "BONUS_MILES",            "target": "bonus_miles" },
+              { "source": "BOOKING_REF",            "target": "pnr_locator" }
+            ],
+            "notes": "airline_code defaulted to 'SR'; cabin_class derived from booking_class; base_miles calculated; status POSTED->PROCESSED"
+          },
+          {
+            "sourceTable": "REDEMPTIONS",
+            "targetTable": "redemptions",
+            "columnMappings": [
+              { "source": "REDEMPTION_ID",    "target": "redemption_id" },
+              { "source": "MEMBER_ID",        "target": "member_id" },
+              { "source": "REWARD_ID",        "target": "reward_id" },
+              { "source": "MILES_REDEEMED",   "target": "miles_used" },
+              { "source": "REDEMPTION_DATE",  "target": "redemption_date" },
+              { "source": "STATUS",           "target": "status" },
+              { "source": "BOOKING_REF",      "target": "confirmation_code" },
+              { "source": "FULFILLMENT_DATE", "target": "fulfillment_date" }
+            ],
+            "notes": "redemption_channel defaulted to 'WEB' for migrated records"
+          },
+          {
+            "sourceTable": "PARTNER_TRANSACTIONS",
+            "targetTable": "partner_transactions",
+            "columnMappings": [
+              { "source": "TXN_ID",             "target": "txn_id" },
+              { "source": "MEMBER_ID",           "target": "member_id" },
+              { "source": "PARTNER_ID",          "target": "partner_id" },
+              { "source": "TXN_TYPE",            "target": "transaction_type" },
+              { "source": "MILES",               "target": "miles_earned" },
+              { "source": "TRANSACTION_DATE",    "target": "transaction_date" },
+              { "source": "TRANSACTION_AMOUNT",  "target": "amount" },
+              { "source": "CURRENCY",            "target": "currency" },
+              { "source": "REFERENCE_NUMBER",    "target": "partner_ref" },
+              { "source": "STATUS",              "target": "status" },
+              { "source": "POSTED_DATE",         "target": "processed_date" }
+            ],
+            "notes": "BURN->REDEEM type mapping; miles split into miles_earned/miles_redeemed based on txn_type"
+          }
+        ]
+      }
+    ]
+  },
+  "migrationSettings": {
+    "parallelism": 4,
+    "batchSize": 10000,
+    "enableValidation": true,
+    "validationOptions": {
+      "enableSchemaValidation": true,
+      "enableDataIntegrityValidation": true,
+      "enableQueryAnalysisValidation": true
+    },
+    "sequenceHandling": "reset_to_max",
+    "truncateTargetTables": true,
+    "disableConstraintsDuringLoad": true,
+    "retryPolicy": {
+      "maxRetries": 3,
+      "retryIntervalSeconds": 30
+    }
+  },
+  "preActions": [
+    "ALTER TABLE flights DROP CONSTRAINT IF EXISTS fk_flights_member",
+    "ALTER TABLE redemptions DROP CONSTRAINT IF EXISTS fk_redemptions_member",
+    "ALTER TABLE redemptions DROP CONSTRAINT IF EXISTS fk_redemptions_reward",
+    "ALTER TABLE partner_transactions DROP CONSTRAINT IF EXISTS fk_partner_txn_member",
+    "ALTER TABLE partner_transactions DROP CONSTRAINT IF EXISTS fk_partner_txn_partner"
+  ],
+  "postActions": [
+    "ALTER TABLE flights ADD CONSTRAINT fk_flights_member FOREIGN KEY (member_id) REFERENCES members(member_id)",
+    "ALTER TABLE redemptions ADD CONSTRAINT fk_redemptions_member FOREIGN KEY (member_id) REFERENCES members(member_id)",
+    "ALTER TABLE redemptions ADD CONSTRAINT fk_redemptions_reward FOREIGN KEY (reward_id) REFERENCES rewards(reward_id)",
+    "ALTER TABLE partner_transactions ADD CONSTRAINT fk_partner_txn_member FOREIGN KEY (member_id) REFERENCES members(member_id)",
+    "ALTER TABLE partner_transactions ADD CONSTRAINT fk_partner_txn_partner FOREIGN KEY (partner_id) REFERENCES partners(partner_id)",
+    "SELECT setval('seq_member_id',     (SELECT COALESCE(MAX(member_id), 1)     FROM members))",
+    "SELECT setval('seq_flight_id',     (SELECT COALESCE(MAX(flight_id), 1)     FROM flights))",
+    "SELECT setval('seq_redemption_id', (SELECT COALESCE(MAX(redemption_id), 1) FROM redemptions))",
+    "SELECT setval('seq_reward_id',     (SELECT COALESCE(MAX(reward_id), 1)     FROM rewards))",
+    "SELECT setval('seq_partner_txn_id',(SELECT COALESCE(MAX(txn_id), 1)        FROM partner_transactions))",
+    "SELECT setval('seq_tier_rule_id',  (SELECT COALESCE(MAX(rule_id), 1)       FROM tier_rules))",
+    "SELECT setval('seq_partner_id',    (SELECT COALESCE(MAX(partner_id), 1)    FROM partners))",
+    "ANALYZE members",
+    "ANALYZE flights",
+    "ANALYZE redemptions",
+    "ANALYZE rewards",
+    "ANALYZE partners",
+    "ANALYZE partner_transactions",
+    "ANALYZE tier_rules"
+  ]
+}

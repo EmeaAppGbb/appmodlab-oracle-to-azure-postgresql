@@ -29,4 +29,12 @@
 \echo '=== Setting up synonym replacements (views & search_path) ==='
 \i schema/05_synonyms_to_views.sql
 
-\echo '=== PostgreSQL schema setup complete ==='
+\echo '=== Loading data ==='
+\i data/01_tier_rules.sql
+\i data/02_rewards.sql
+\i data/03_members.sql
+\i data/04_flights.sql
+\i data/05_redemptions.sql
+\i data/06_partner_transactions.sql
+
+\echo '=== PostgreSQL setup complete (schema + data) ==='
