@@ -1,0 +1,164 @@
+ÔùÅ List directory .
+  Ôöö 13 files found
+
+ÔùÅ List directory docs
+  Ôöö 5 files found
+
+ÔùÅ List directory postgresql
+  Ôöö 9 files found
+
+ÔùÅ List directory scripts
+  Ôöö 2 files found
+
+ÔùÅ Read setup.sql
+  Ôöé postgresql\setup.sql
+  Ôöö 40 lines read
+
+ÔùÅ List directory postgresql\schema
+  Ôöö 5 files found
+
+ÔùÅ List directory postgresql\triggers
+  Ôöö 3 files found
+
+ÔùÅ List directory postgresql\views
+  Ôöö 4 files found
+
+ÔùÅ List directory postgresql\functions
+  Ôöö 13 files found
+
+ÔùÅ List directory postgresql\queues
+  Ôöö 1 file found
+
+ÔùÅ List directory postgresql\procedures
+  Ôöö 3 files found
+
+ÔùÅ List directory postgresql\scheduler
+  Ôöö 3 files found
+
+ÔùÅ List directory postgresql\data
+  Ôöö 6 files found
+
+ÔùÅ Explore Explore all SQL files
+  Ôöö Agent started in background with agent_id: explore-sql-files. You can us...
+
+ÔùÅ Read (Explore agent ÔÇö Explore all SQL files)
+  Ôöö Running
+
+ÔùÅ Read (Explore agent ÔÇö Explore all SQL files)
+  Ôöö Completed
+
+ÔùÅ Read 1776371677089-copilot-tool-output-6a4411.txt
+  Ôöé ~\AppData\Local\Temp\1776371677089-copilot-tool-output-6a4411.txt
+  Ôöö L1:200 (199 lines read)
+
+ÔùÅ Read 1776371677089-copilot-tool-output-6a4411.txt
+  Ôöé ~\AppData\Local\Temp\1776371677089-copilot-tool-output-6a4411.txt
+  Ôöö L200:500 (272 lines read)
+
+ÔùÅ Read docker-compose.yml
+  Ôöö 44 lines read
+
+Now I have a comprehensive understanding. Let me create all the files. I'll use a rubber-duck review on my plan first, then create everything in parallel.
+
+ÔùÅ Rubber-duck Review validation plan
+  Ôöé Search (grep)
+  Ôöé   Ôöé "CREATE\s+(OR\s+REPLACE\s+)?VIEW" in **/*.sql (postgresql)
+  Ôöé   Ôöö 15 lines found
+  Ôöö Search (grep)
+      Ôöé "CREATE\s+MATERIALIZED\s+VIEW" in **/*.sql (postgresql)
+      Ôöö 2 lines found
+
+ÔùÅ Read tier_calculation.sql
+  Ôöé postgresql\functions\tier_calculation.sql
+  Ôöö L1:30 (30 lines read)
+
+ÔùÅ Read redemption_mgmt.sql
+  Ôöé postgresql\functions\redemption_mgmt.sql
+  Ôöö L1:40 (40 lines read)
+
+ÔùÅ Read validation.sql
+  Ôöé postgresql\functions\validation.sql
+  Ôöö L1:30 (30 lines read)
+
+Good critique. Key adjustments: (1) use RAISE EXCEPTION not just NOTICE for failures, (2) count views correctly (11 alias + 2 business), (3) guard pgmq/pg_cron with extension checks, (4) don't assert exact IDs. Let me now create all files.
+
+ÔùÅ Create test and workflow directories (shell)
+  Ôöé New-Item -ItemType Directory -Force -Path
+  Ôöé "C:\code\gbb\labs\appmodlab-oracle-to-azure-postgresql\tests\integration" |
+  Ôöé Out-Null; New-Item -ItemType Directory -Force -Path
+  Ôöé "C:\code\gbb\labs\appmodlab-oracle-to-azure-postgresql\.github\workflows" |
+  Ôöé Out-Null; Write-Output "Directories created"
+  Ôöö 2 lines...
+
+Now let me create all files. I'll do the setup.sql update and create the new files in parallel:
+
+ÔùÅ Edit setup.sql +124 -1
+  Ôöö postgresql\setup.sql
+
+ÔùÅ Create validate-schema.sql +434
+  Ôöö scripts\validate-schema.sql
+
+ÔùÅ Create validate-functions.sql +544
+  Ôöö scripts\validate-functions.sql
+
+ÔùÅ Create run-validation.sh +136
+  Ôöö scripts\run-validation.sh
+
+Now let me create the integration tests, CI workflow, and documentation:
+
+ÔùÅ Create 06-validation-guide.md +265
+  Ôöö docs\06-validation-guide.md
+
+ÔùÅ Create test_member_registration.sql +84
+  Ôöö tests\integration\test_member_registration.sql
+
+ÔùÅ Create test_flight_accrual.sql +104
+  Ôöö tests\integration\test_flight_accrual.sql
+
+ÔùÅ Create test_tier_upgrade.sql +92
+  Ôöö tests\integration\test_tier_upgrade.sql
+
+ÔùÅ Create test_redemption_flow.sql +126
+  Ôöö tests\integration\test_redemption_flow.sql
+
+ÔùÅ Create test_partner_transaction.sql +111
+  Ôöö tests\integration\test_partner_transaction.sql
+
+ÔùÅ Create ci.yml +95
+  Ôöö .github\workflows\ci.yml
+
+Now let me verify the file structure and commit:
+
+ÔùÅ Check git status (shell)
+  Ôöé cd C:\code\gbb\labs\appmodlab-oracle-to-azure-postgresql && git --no-pager
+  Ôöé diff --stat && echo "---" && git --no-pager status --short
+  Ôöö 12 lines...
+
+ÔùÅ Commit all validation files (shell)
+  Ôöé cd C:\code\gbb\labs\appmodlab-oracle-to-azure-postgresql && git add
+  Ôöé postgresql/setup.sql scripts/validate-schema.sql
+  Ôöé scripts/validate-functions.sql scripts/run-validation.sh
+  Ôöé tests/integration/ .github/workflows/ci.yml docs/06-validation-guide.md &&
+  Ôöé git --no-pager commit -m "Step 8: Add comprehensive migration validation ÔÇª
+  Ôöö 40 lines...
+
+All 7 deliverables are committed (11 files, 2105 lines added):
+
+1. **`postgresql/setup.sql`** ÔÇö Updated with ALL files in dependency order (schema ÔåÆ functions ÔåÆ procedures ÔåÆ triggers ÔåÆ views ÔåÆ data ÔåÆ optional pgmq/pg_cron with guards)
+
+2. **`scripts/validate-schema.sql`** ÔÇö Validates 11 tables, 11 sequences, 13 views, 2 materialized views, 80+ functions, 3 triggers, indexes, FK constraints. Uses `RAISE EXCEPTION` on failures.
+
+3. **`scripts/validate-functions.sql`** ÔÇö 20 function tests in a ROLLBACK transaction covering all major function groups (member mgmt, flight accrual, tier calc, redemption, validation, audit, batch, notification, reporting).
+
+4. **`scripts/run-validation.sh`** ÔÇö Bash orchestrator with 5 phases, configurable via env vars, pass/fail summary.
+
+5. **`tests/integration/`** ÔÇö 5 end-to-end test files: member registration, flight accrual, tier upgrade, redemption flow, partner transaction.
+
+6. **`.github/workflows/ci.yml`** ÔÇö GitHub Actions with PostgreSQL 16 service, auto-triggers on relevant file changes.
+
+7. **`docs/06-validation-guide.md`** ÔÇö Complete guide with procedures, expected results, and troubleshooting.
+
+
+Changes   +2115 -1
+Requests  3 Premium (11m 1s)
+Tokens    Ôåæ 1.2m ÔÇó Ôåô 48.0k ÔÇó 985.0k (cached) ÔÇó 3.5k (reasoning)
