@@ -19,6 +19,26 @@ services:
       timeout: 10s
       retries: 5
 
+  postgresql:
+    image: postgres:16-alpine
+    container_name: skyreward-postgresql
+    ports:
+      - "5433:5432"
+    environment:
+      - POSTGRES_USER=skyreward_admin
+      - POSTGRES_PASSWORD=PostgresPass123
+      - POSTGRES_DB=skyreward
+    volumes:
+      - postgresql-data:/var/lib/postgresql/data
+      - ./postgresql:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U skyreward_admin -d skyreward"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
 volumes:
   oracle-data:
+    driver: local
+  postgresql-data:
     driver: local
