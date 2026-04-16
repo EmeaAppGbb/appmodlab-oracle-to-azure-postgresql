@@ -1,0 +1,63 @@
+# =============================================================================
+# SkyReward Application - Oracle Configuration (pre-migration reference)
+# =============================================================================
+# This file is kept for reference to document the Oracle configuration that was
+# in use before the migration to PostgreSQL. It is NOT active in the default
+# profile. Activate with: --spring.profiles.active=oracle
+#
+# MIGRATION NOTES:
+#   1. The Oracle JDBC driver (ojdbc11) must be on the classpath.
+#   2. Oracle UCP was used for connection pooling (now replaced by HikariCP).
+#   3. The Oracle dialect and Oracle-specific SQL patterns are no longer needed.
+#   4. Oracle's DATE type includes time; PostgreSQL separates DATE and TIMESTAMP.
+
+spring:
+  datasource:
+    # Oracle JDBC URL format: jdbc:oracle:thin:@<host>:<port>/<service_name>
+    # PostgreSQL equivalent: jdbc:postgresql://<host>:<port>/<database>
+    url: jdbc:oracle:thin:@localhost:1521/SKYREWARD
+    username: SKYREWARD_APP
+    password: OraclePass123
+    driver-class-name: oracle.jdbc.OracleDriver
+
+    # Oracle UCP (Universal Connection Pool) settings
+    # MIGRATION NOTE: Replaced by HikariCP (Spring Boot default) for PostgreSQL.
+    # UCP required the com.oracle.database.jdbc:ucp dependency.
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 5
+
+  jpa:
+    # MIGRATION NOTE: Changed to org.hibernate.dialect.PostgreSQLDialect
+    database-platform: org.hibernate.dialect.OracleDialect
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        format_sql: true
+
+  flyway:
+    enabled: true
+    locations: classpath:db/migration/oracle
+
+# =============================================================================
+# Key Differences: Oracle vs PostgreSQL JDBC
+# =============================================================================
+#
+# | Aspect                | Oracle                              | PostgreSQL                         |
+# |-----------------------|-------------------------------------|------------------------------------|
+# | JDBC URL prefix       | jdbc:oracle:thin:@                  | jdbc:postgresql://                 |
+# | Driver class          | oracle.jdbc.OracleDriver            | org.postgresql.Driver              |
+# | Connection pool       | Oracle UCP                          | HikariCP (Spring Boot default)     |
+# | Hibernate dialect     | OracleDialect                       | PostgreSQLDialect                  |
+# | Sequence syntax       | seq.NEXTVAL                         | nextval('seq')                     |
+# | Date type             | DATE includes time                  | DATE is date-only; use TIMESTAMP   |
+# | String functions      | NVL, DECODE                         | COALESCE, CASE                     |
+# | CLOB handling         | oracle.sql.CLOB                     | Standard TEXT type                  |
+# | Stored proc calls     | {call PKG.PROC(?)}                  | SELECT func(?)                     |
+# | Auto-commit           | Default OFF                         | Default ON (Spring manages txn)    |
+# | Case sensitivity      | Identifiers uppercase by default    | Identifiers lowercase by default   |
+# | Pagination            | ROWNUM / FETCH FIRST                | LIMIT / OFFSET                     |
+# | Boolean type          | NUMBER(1) or VARCHAR2(1)            | Native BOOLEAN                     |
+# | Concatenation         | || (same)                           | || (same)                          |
+# | Empty string          | Treated as NULL                     | Empty string ≠ NULL                |
