@@ -11,7 +11,7 @@ modernizationTools: ["ora2pg"]
 agenticTools: []
 tags: ["oracle", "postgresql", "database-migration", "plsql", "plpgsql", "ora2pg"]
 extensions: ["github.copilot"]
-thumbnail: ""
+thumbnail: "https://raw.githubusercontent.com/EmeaAppGbb/appmodlab-oracle-to-azure-postgresql/main/assets/thumbnail-gpt-image.png"
 video: ""
 version: "1.0.0"
 screenshots:
